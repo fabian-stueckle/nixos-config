@@ -96,6 +96,12 @@
   # Install firefox.
   programs.firefox.enable = true;
 
+  # Enable Hyprland
+  programs.hyprland.enable = true;
+
+  # VR
+  # programs.alvr.enable = true;
+
   # Allow unfree packages
   nixpkgs.config.allowUnfree = true;
 
@@ -111,7 +117,43 @@
     whatsapp-electron
     vscode
     neovim
+
+    # Nix Development
+    nixd
+
+    # Hyprland
+    hyprland
+    waybar
+    rofi
+    alacritty
+    kitty
+    xwayland
+    swaynotificationcenter
+    qt5.qtwayland
+    qt6.qtwayland
+    polkit_gnome
+    gnome-keyring
+    xdg-desktop-portal
+    xdg-desktop-portal-hyprland  # Hyprland-spezifisches Portal
+    
+    # Fonts
+    cantarell-fonts
+    dejavu_fonts
+    inconsolata
+    nerd-fonts.fira-code
+
+    blueman
   ];
+
+  # Set up Wayland
+  environment.variables = {
+    WAYLAND_DISPLAY = "wayland-0";
+  };
+
+  # Notification daemon über hpyrland.conf starten
+  systemd.services.swaynotificationcenter = {
+    enable = false;
+  };
 
   # Some programs need SUID wrappers, can be configured further or are
   # started in user sessions.
