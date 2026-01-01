@@ -3,11 +3,11 @@
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
 { config, pkgs, ... }:
-
 {
   imports =
-    [ # Include the results of the hardware scan.
-      ./hardware-configuration.nix
+    [ 
+      # Include the results of the hardware scan.
+      ./hardware-configuration.nix  
     ];
 
   # Bootloader.
@@ -87,17 +87,67 @@
   users.users.fabian = {
     isNormalUser = true;
     description = "Fabian";
-    extraGroups = [ "networkmanager" "wheel" ];
+    extraGroups = [ "networkmanager" "wheel" "plugdev" ];
     packages = with pkgs; [
     #  thunderbird
     ];
   };
+
+  # Extra User for playing VR games
+  users.users.vruser = {
+    isNormalUser = true;
+    description = "VR User";
+    group = "users";
+    createHome = true;
+    extraGroups = [ "video" "input" ];  # Hinzufügen der nötigen Gruppen für VR
+  };
+
+  # DMS (Dank material shell)
+  programs.dms-shell = {
+    enable = true;
+
+    systemd = {
+      enable = true;             # Systemd service for auto-start
+      restartIfChanged = true;   # Auto-restart dms.service when dms-shell changes
+    };
+    
+    # Core features
+    # enableSystemMonitoring = true;     # System monitoring widgets (dgop)
+    # enableClipboard = true;            # Clipboard history manager
+    # enableVPN = true;                  # VPN management widget
+    # enableDynamicTheming = true;       # Wallpaper-based theming (matugen)
+    # enableAudioWavelength = true;      # Audio visualizer (cava)
+    # enableCalendarEvents = true;       # Calendar integration (khal)
+  };
+
+  # Shared Data EXFat Drive
+  fileSystems."/mnt/data" = {
+    device = "/dev/nvme3n1p1";
+    fsType = "exfat";
+    options = [ "umask=000" "uid=1000" "gid=100" "sync" "noatime" ];
+  };
+
+
+  # Polkit-Regeln für udisks2 hinzufügen
+  environment.etc."polkit-1/rules.d/00-udisks2.rules".text = ''
+    polkit.addRule(function(action, subject) {
+      if (action.id.indexOf("org.freedesktop.udisks2.") == 0 && subject.isInGroup("users")) {
+          return polkit.Result.YES;
+      }
+    });
+  '';
 
   # Install firefox.
   programs.firefox.enable = true;
 
   # Enable Hyprland
   programs.hyprland.enable = true;
+
+  # STEAM
+  programs.steam = {
+    enable = true;
+    remotePlay.openFirewall = true;
+  };
 
   # VR
   # programs.alvr.enable = true;
@@ -117,6 +167,9 @@
     whatsapp-electron
     vscode
     neovim
+    kdePackages.dolphin
+    # unstable.dms-shell
+    # unstable.dgop
 
     # Nix Development
     nixd
@@ -155,6 +208,9 @@
     enable = false;
   };
 
+  # FLAKES
+  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+
   # Some programs need SUID wrappers, can be configured further or are
   # started in user sessions.
   # programs.mtr.enable = true;
@@ -164,6 +220,10 @@
   # };
 
   # List services that you want to enable:
+
+  services.udisks2 = {
+    enable = true;
+  };
 
   # Enable the OpenSSH daemon.
   # services.openssh.enable = true;
