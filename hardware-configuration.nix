@@ -28,6 +28,18 @@
     [ { device = "/dev/disk/by-uuid/7f86986e-dee0-4412-ad78-71b40c85553e"; }
     ];
 
+  # Ext4 drive "Daten"
+  # fileSystems."/run/media/fabian/Daten" = {
+  #   device = "/dev/nvme3n1p1";
+  #   fsType = "ext4";
+  #   options = [
+  #     "umask=0002"
+  #     "uid=1000"
+  #     "gid=100"
+  #   ];
+  # };
+
+
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   hardware.cpu.amd.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
 }

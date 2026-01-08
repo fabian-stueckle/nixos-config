@@ -17,6 +17,18 @@
   # Use latest kernel.
   boot.kernelPackages = pkgs.linuxPackages_latest;
 
+  # Needed for Steam VR elevated privileges (see https://wiki.nixos.org/wiki/VR)
+  boot.kernelPatches = [
+  {
+    name = "amdgpu-ignore-ctx-privileges";
+    patch = pkgs.fetchpatch {
+      name = "cap_sys_nice_begone.patch";
+      url = "https://github.com/Frogging-Family/community-patches/raw/master/linux61-tkg/cap_sys_nice_begone.mypatch";
+      hash = "sha256-Y3a0+x2xvHsfLax/uwycdJf3xLxvVfkfDVqjkxNaYEo=";
+    };
+  }
+];
+
   networking.hostName = "nixos"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
 
@@ -49,8 +61,15 @@
   services.xserver.enable = true;
 
   # Enable the GNOME Desktop Environment.
-  services.xserver.displayManager.gdm.enable = true;
-  services.xserver.desktopManager.gnome.enable = true;
+  services.displayManager.gdm = {
+    enable = true;
+  #  settings = {
+  #    "org.gnome.desktop.interface" = {
+  #      primary-monitor = "DP-2";   # ← dein *Schreibtisch-Monitor*
+  #    };
+  #  };
+  };
+  services.desktopManager.gnome.enable = true;
 
   # Configure keymap in X11
   services.xserver.xkb = {
@@ -120,14 +139,6 @@
     # enableCalendarEvents = true;       # Calendar integration (khal)
   };
 
-  # Shared Data EXFat Drive
-  fileSystems."/mnt/data" = {
-    device = "/dev/nvme3n1p1";
-    fsType = "exfat";
-    options = [ "umask=000" "uid=1000" "gid=100" "sync" "noatime" ];
-  };
-
-
   # Polkit-Regeln für udisks2 hinzufügen
   environment.etc."polkit-1/rules.d/00-udisks2.rules".text = ''
     polkit.addRule(function(action, subject) {
@@ -147,10 +158,98 @@
   programs.steam = {
     enable = true;
     remotePlay.openFirewall = true;
+    gamescopeSession.enable = true;
+  };
+
+  programs.gamemode.enable = true;
+
+  # programs.gamescope ={
+  #   enable = true;
+  #   capSysNice = true;
+  # };
+
+  # programs.steam = let
+  #   patchedBwrap = pkgs.bubblewrap.overrideAttrs (o: {
+  #     patches = (o.patches or []) ++ [
+  #       # ./bwrap.patch
+  #       ./bwrap.patch
+  #     ];
+  #   });
+  # in {
+  #   enable = true;
+  #   package = pkgs.steam.override {
+  #     buildFHSEnv = (args: ((pkgs.buildFHSEnv.override {
+  #       bubblewrap = patchedBwrap;
+  #     }) (args // {
+  #       extraBwrapArgs = (args.extraBwrapArgs or []) ++ [ "--cap-add ALL" ];
+  #     })));
+  #   };
+  # };
+
+
+
+  # services.wivrn = {
+  #   enable = true;
+  #   openFirewall = true;
+
+  #   # Write information to /etc/xdg/openxr/1/active_runtime.json, VR applications
+  #   # will automatically read this and work with WiVRn (Note: This does not currently
+  #   # apply for games run in Valve's Proton)
+  #   defaultRuntime = true;
+
+
+  #   # Run WiVRn as a systemd service on startup
+  #   # autoStart = true;
+
+  #   # If you're running this with an nVidia GPU and want to use GPU Encoding (and don't otherwise have CUDA enabled system wide), you need to override the cudaSupport variable.
+  #   # package = (pkgs.wivrn.override { cudaSupport = true; });
+
+  #   # You should use the default configuration (which is no configuration), as that works the best out of the box.
+  #   # However, if you need to configure something see https://github.com/WiVRn/WiVRn/blob/master/docs/configuration.md for configuration options and https://mynixos.com/nixpkgs/option/services.wivrn.config.json for an example configuration.
+  # };
+
+
+  hardware.steam-hardware.enable = true;
+
+  hardware.amdgpu.overdrive.enable = true;
+
+  hardware.graphics = {
+    enable = true;
+    enable32Bit = true;
   };
 
   # VR
-  # programs.alvr.enable = true;
+  # programs.alvr = {
+  #   enable = true;
+  #   openFirewall = true;
+  # };
+
+  programs.alvr = {
+    enable = true;
+
+    openFirewall = true;
+
+    # Pin to 20.13.0 due to https://github.com/alvr-org/ALVR/issues/3134
+    package = pkgs.alvr.overrideAttrs (
+      finalAttrs: prevAttrs: {
+        version = "20.13.0";
+
+        src = pkgs.fetchFromGitHub {
+          owner = "alvr-org";
+          repo = "ALVR";
+          tag = "v${finalAttrs.version}";
+          fetchSubmodules = true;
+          hash = "sha256-h7/fuuolxbNkjUbqXZ7NTb1AEaDMFaGv/S05faO2HIc=";
+        };
+
+        cargoDeps = pkgs.rustPlatform.fetchCargoVendor {
+          inherit (finalAttrs) src;
+          hash = "sha256-A0ADPMhsREH1C/xpSxW4W2u4ziDrKRrQyY5kBDn//gQ=";
+        };
+      }
+    );
+  };
+
 
   # Allow unfree packages
   nixpkgs.config.allowUnfree = true;
@@ -167,12 +266,18 @@
     whatsapp-electron
     vscode
     neovim
-    kdePackages.dolphin
-    # unstable.dms-shell
-    # unstable.dgop
+    vlc
 
     # Nix Development
     nixd
+
+    # Gaming
+    protonplus
+    gamescope
+    mangohud
+    goverlay
+
+    lact
 
     # Hyprland
     hyprland
@@ -186,8 +291,18 @@
     qt6.qtwayland
     polkit_gnome
     gnome-keyring
+
     xdg-desktop-portal
+    kdePackages.xdg-desktop-portal-kde
+    # xdg-desktop-portal-gtk
     xdg-desktop-portal-hyprland  # Hyprland-spezifisches Portal
+
+    hyprshot
+
+    nwg-look
+
+    bibata-cursors
+    papirus-icon-theme
     
     # Fonts
     cantarell-fonts
@@ -195,17 +310,72 @@
     inconsolata
     nerd-fonts.fira-code
 
+    xnviewmp
+
+    # QT Themes
+    kdePackages.qt6ct
+    # GTK Themes
+    adw-gtk3
+
     blueman
+
+    # ROCM
+    rocmPackages.rocminfo
+    rocmPackages.rocm-smi
+
+    distrobox
   ];
+
+  xdg.portal.enable = true;
+  xdg.portal.extraPortals = [
+    pkgs.kdePackages.xdg-desktop-portal-kde
+    # xdg-desktop-portal-gtk
+    pkgs.xdg-desktop-portal-hyprland
+  ];
+
+  xdg.mime = {
+    enable = true;
+    defaultApplications = {
+      "image/png" = [ "org.gnome.Loupe.desktop" ];
+      "image/jpeg" = [ "org.gnome.Loupe.desktop" ];
+      "image/webp" = [ "org.gnome.Loupe.desktop" ];
+    };
+  };
+
+  # 🔧 Fix für leere "Öffnen mit…" / MIME-Listen in Dolphin
+  environment.etc."/xdg/menus/applications.menu".text =
+    builtins.readFile "${pkgs.kdePackages.plasma-workspace}/etc/xdg/menus/plasma-applications.menu";
+
 
   # Set up Wayland
   environment.variables = {
-    WAYLAND_DISPLAY = "wayland-0";
+    QT_QPA_PLATFORMTHEME = "qt6ct";
+    GTK_THEME = "Adwaita-dark";
+    # WAYLAND_DISPLAY = "wayland-1"; # TODO: wayland-1 ? Siehe hyprland.conf
   };
 
   # Notification daemon über hpyrland.conf starten
   systemd.services.swaynotificationcenter = {
     enable = false;
+  };
+
+  services.avahi = {
+    nssmdns4 = true;
+    enable = true;
+    ipv4 = true;
+    ipv6 = true;
+    publish = {
+      enable = true;
+      addresses = true;
+      workstation = true;
+      userServices = true;
+    };
+  };
+
+  # For Distrobox
+  virtualisation.podman = {
+    enable = true;
+    dockerCompat = true;
   };
 
   # FLAKES
@@ -225,6 +395,27 @@
     enable = true;
   };
 
+  services.dbus.enable = true;
+  services.gnome.gnome-keyring.enable = true;
+  services.udev.packages = [
+    pkgs.steam
+    # pkgs.steamvr
+  ];
+
+  systemd.services.lact = {
+    description = "AMDGPU Control Daemon";
+    after = ["multi-user.target"];
+    wantedBy = ["multi-user.target"];
+    serviceConfig = {
+      ExecStart = "${pkgs.lact}/bin/lact daemon";
+    };
+    enable = true;
+  };
+
+  services.flatpak.enable = true;
+
+  programs.seahorse.enable = true;
+
   # Enable the OpenSSH daemon.
   # services.openssh.enable = true;
 
@@ -233,6 +424,12 @@
   # networking.firewall.allowedUDPPorts = [ ... ];
   # Or disable the firewall altogether.
   # networking.firewall.enable = false;
+  networking.firewall = {
+    enable = true;
+    allowedUDPPorts = [ 5353 9757 ]; # WiVRn
+    allowedTCPPorts = [ 9757 ];      # WiVRn
+  };
+ 
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions
